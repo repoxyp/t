@@ -1,0 +1,1355 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tailor Shop Receipt Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=SolaimanLipi&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        body {
+            font-family: 'SolaimanLipi', Arial, sans-serif;
+            background-color: #f3f4f6;
+        }
+        .bangla-font {
+            font-family: 'SolaimanLipi', Arial, sans-serif;
+        }
+        .receipt {
+            border: 1px dashed #000;
+            padding: 20px;
+            max-width: 400px;
+            margin: 0 auto;
+            background-color: white;
+        }
+        .receipt-header {
+            text-align: center;
+            border-bottom: 2px solid #000;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .receipt-footer {
+            text-align: center;
+            border-top: 2px solid #000;
+            padding-top: 10px;
+            margin-top: 15px;
+        }
+        .clothes-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        .hidden {
+            display: none;
+        }
+        .active-tab {
+            background-color: #3B82F6;
+            color: white;
+        }
+        .receipt-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .receipt-card {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+        .receipt-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status-pending {
+            background-color: #F59E0B;
+            color: white;
+        }
+        .status-delivered {
+            background-color: #10B981;
+            color: white;
+        }
+        .status-deleted {
+            background-color: #EF4444;
+            color: white;
+        }
+        .nav-tabs {
+            display: flex;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .nav-tab {
+            flex: 1;
+            text-align: center;
+            padding: 12px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .nav-tab:hover {
+            background: #EFF6FF;
+        }
+        .form-section {
+            background: white;
+            border-radius: 8px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 25px;
+        }
+        .form-title {
+            color: #1E40AF;
+            border-bottom: 2px solid #E5E7EB;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .action-btn {
+            flex: 1;
+            min-width: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .instructions {
+            background: #DBEAFE;
+            border-left: 4px solid #3B82F6;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .feature-icon {
+            width: 40px;
+            height: 40px;
+            background: #3B82F6;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+        }
+        .feature-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .feature-item {
+            flex: 1;
+            min-width: 250px;
+            display: flex;
+            align-items: center;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl font-bold bangla-font text-blue-800">দর্জি দোকান রসিদ ব্যবস্থাপনা</h1>
+            <p class="text-lg bangla-font text-blue-600">কাপড় জমা ও হস্তান্তর রসিদ ব্যবস্থাপনা সিস্টেম</p>
+        </header>
+
+        <!-- API Configuration -->
+        <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+            <h2 class="text-xl font-bold mb-4 text-blue-800">Google Sheets API Configuration</h2>
+            <div class="mb-4">
+                <label class="block text-gray-700 bangla-font mb-2" for="apiUrl">Google Apps Script Web App URL</label>
+                <input type="text" id="apiUrl" class="w-full px-4 py-2 border rounded-lg" placeholder="https://script.google.com/macros/s/..." value="">
+                <p class="text-sm text-gray-500 mt-1">Enter your Google Apps Script Web App URL here</p>
+            </div>
+            <button id="saveApiUrl" class="bg-blue-500 text-white px-4 py-2 rounded-lg bangla-font">
+                Save API URL
+            </button>
+        </div>
+
+        <!-- Feature Overview -->
+        <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+            <h2 class="text-xl font-bold mb-4 text-blue-800">সিস্টেমের বৈশিষ্ট্যসমূহ</h2>
+            <div class="feature-list">
+                <div class="feature-item">
+                    <div class="feature-icon">
+                        <i class="fas fa-receipt"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold">রসিদ তৈরি</h3>
+                        <p class="text-sm">পেন্ডিং ও ডেলিভারি রসিদ তৈরি করুন</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">
+                        <i class="fas fa-database"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold">Google Sheets ডেটাবেস</h3>
+                        <p class="text-sm">সমস্ত ডেটা Google Sheets এ সংরক্ষণ করুন</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">
+                        <i class="fas fa-search"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold">অনুসন্ধান</h3>
+                        <p class="text-sm">সিরিয়াল, নাম বা মোবাইল নম্বর দিয়ে খুঁজুন</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">
+                        <i class="fas fa-trash-restore"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold">ডিলিট/পুনরুদ্ধার</h3>
+                        <p class="text-sm">৬০ দিনের জন্য ডিলিট করা রেকর্ড পুনরুদ্ধার করুন</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="nav-tabs mb-8">
+            <div class="nav-tab active-tab bangla-font" data-tab="create">
+                <i class="fas fa-plus-circle"></i> রসিদ তৈরি
+            </div>
+            <div class="nav-tab bangla-font" data-tab="deliver">
+                <i class="fas fa-truck"></i> অর্ডার হস্তান্তর
+            </div>
+            <div class="nav-tab bangla-font" data-tab="search">
+                <i class="fas fa-search"></i> রসিদ খুঁজুন
+            </div>
+            <div class="nav-tab bangla-font" data-tab="history">
+                <i class="fas fa-history"></i> ইতিহাস
+            </div>
+            <div class="nav-tab bangla-font" data-tab="deleted">
+                <i class="fas fa-trash"></i> ডিলিট করা
+            </div>
+        </div>
+
+        <!-- Create Receipt Form -->
+        <div id="createReceiptSection" class="form-section">
+            <h2 class="form-title bangla-font">কাপড় জমা রসিদ তৈরি করুন</h2>
+            
+            <div class="instructions">
+                <p class="bangla-font">গ্রাহকের কাছ থেকে কাপড় গ্রহণ করার পর এই ফর্মটি পূরণ করুন। সিস্টেম স্বয়ংক্রিয়ভাবে একটি সিরিয়াল নম্বর তৈরি করবে।</p>
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-gray-700 bangla-font mb-2" for="shopName">দোকানের নাম</label>
+                <input type="text" id="shopName" class="w-full px-4 py-2 border rounded-lg bangla-font" value="আরিফ টেইলার্স" placeholder="দোকানের নাম লিখুন">
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-gray-700 bangla-font mb-2" for="customerName">গ্রাহকের নাম *</label>
+                <input type="text" id="customerName" class="w-full px-4 py-2 border rounded-lg bangla-font" placeholder="গ্রাহকের নাম লিখুন" required>
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-gray-700 bangla-font mb-2" for="customerMobile">মোবাইল নম্বর</label>
+                <input type="text" id="customerMobile" class="w-full px-4 py-2 border rounded-lg" placeholder="মোবাইল নম্বর লিখুন">
+            </div>
+            
+            <div class="mb-6">
+                <label class="block text-gray-700 bangla-font mb-2">কাপড়ের তালিকা</label>
+                <div id="clothesList" class="mb-4">
+                    <!-- Clothes items will be added here -->
+                </div>
+                <button id="addClothBtn" class="bg-blue-500 text-white px-4 py-2 rounded-lg bangla-font">
+                    <i class="fas fa-plus"></i> কাপড় যোগ করুন
+                </button>
+            </div>
+            
+            <div class="flex justify-between">
+                <button id="generatePendingReceipt" class="bg-green-600 text-white px-6 py-3 rounded-lg bangla-font">
+                    <i class="fas fa-receipt"></i> রসিদ তৈরি করুন
+                </button>
+                <button id="resetForm" class="bg-gray-500 text-white px-6 py-3 rounded-lg bangla-font">
+                    <i class="fas fa-redo"></i> ফর্ম রিসেট
+                </button>
+            </div>
+        </div>
+
+        <!-- Deliver Order Form -->
+        <div id="deliverOrderSection" class="form-section hidden">
+            <h2 class="form-title bangla-font">অর্ডার হস্তান্তর করুন</h2>
+            
+            <div class="instructions">
+                <p class="bangla-font">গ্রাহককে কাপড় হস্তান্তর করার সময় এই ফর্মটি ব্যবহার করুন। পেন্ডিং অর্ডারের সিরিয়াল নম্বর দিয়ে খুঁজুন এবং মূল্য যোগ করুন。</p>
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-gray-700 bangla-font mb-2" for="searchSerial">সিরিয়াল নম্বর</label>
+                <div class="flex">
+                    <input type="text" id="searchSerial" class="w-full px-4 py-2 border rounded-lg" placeholder="সিরিয়াল নম্বর লিখুন">
+                    <button id="searchPendingBtn" class="bg-blue-500 text-white px-4 py-2 rounded-lg ml-2 bangla-font">
+                        <i class="fas fa-search"></i> খুঁজুন
+                    </button>
+                </div>
+            </div>
+            
+            <div id="deliveryForm" class="hidden">
+                <div class="mb-4">
+                    <label class="block text-gray-700 bangla-font mb-2">গ্রাহকের নাম</label>
+                    <p id="deliveryCustomerName" class="px-4 py-2 border rounded-lg bg-gray-100 bangla-font"></p>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-gray-700 bangla-font mb-2">মোবাইল নম্বর</label>
+                    <p id="deliveryCustomerMobile" class="px-4 py-2 border rounded-lg bg-gray-100"></p>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-gray-700 bangla-font mb-2">কাপড়ের তালিকা</label>
+                    <div id="deliveryClothesList">
+                        <!-- Delivery clothes items with prices will be added here -->
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-gray-700 bangla-font mb-2" for="additionalNote">অতিরিক্ত মন্তব্য</label>
+                    <textarea id="additionalNote" class="w-full px-4 py-2 border rounded-lg bangla-font" placeholder="অতিরিক্ত মন্তব্য লিখুন (ঐচ্ছিক)"></textarea>
+                </div>
+                
+                <div class="mb-4 text-right">
+                    <p class="text-xl font-bold bangla-font">মোট: ৳<span id="totalAmount">0</span></p>
+                </div>
+                
+                <div class="flex justify-between">
+                    <button id="generateDeliveryReceipt" class="bg-green-600 text-white px-6 py-3 rounded-lg bangla-font">
+                        <i class="fas fa-check-circle"></i> হস্তান্তর রসিদ তৈরি করুন
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search Receipts -->
+        <div id="searchReceiptSection" class="form-section hidden">
+            <h2 class="form-title bangla-font">রসিদ খুঁজুন</h2>
+            
+            <div class="instructions">
+                <p class="bangla-font">সিরিয়াল নম্বর, গ্রাহকের নাম বা মোবাইল নম্বর ব্যবহার করে রসিদ খুঁজুন।</p>
+            </div>
+            
+            <div class="search-box">
+                <input type="text" id="searchQuery" class="flex-grow px-4 py-2 border rounded-lg" placeholder="সিরিয়াল নম্বর, গ্রাহকের নাম বা মোবাইল নম্বর লিখুন">
+                <button id="searchReceiptBtn" class="bg-blue-500 text-white px-6 py-2 rounded-lg bangla-font">
+                    <i class="fas fa-search"></i> খুঁজুন
+                </button>
+            </div>
+            
+            <div id="searchResults" class="mt-6">
+                <!-- Search results will be displayed here -->
+            </div>
+        </div>
+
+        <!-- Receipt History -->
+        <div id="historySection" class="form-section hidden">
+            <h2 class="form-title bangla-font">রসিদের ইতিহাস</h2>
+            
+            <div class="instructions">
+                <p class="bangla-font">সমস্ত রসিদের ইতিহাস এখানে দেখুন। আপনি রসিদ দেখতে, প্রিন্ট করতে বা শেয়ার করতে পারেন।</p>
+            </div>
+            
+            <div class="mb-4">
+                <button id="refreshHistory" class="bg-blue-500 text-white px-4 py-2 rounded-lg bangla-font">
+                    <i class="fas fa-sync-alt"></i> রিফ্রেশ
+                </button>
+            </div>
+            
+            <div id="receiptHistory" class="receipt-grid">
+                <!-- Receipt history will be displayed here -->
+            </div>
+        </div>
+
+        <!-- Deleted Receipts -->
+        <div id="deletedSection" class="form-section hidden">
+            <h2 class="form-title bangla-font">ডিলিট করা রসিদ</h2>
+            
+            <div class="instructions">
+                <p class="bangla-font">ডিলিট করা রসিদগুলির তালিকা। আপনি ৬০ দিনের মধ্যে যেকোনো রসিদ পুনরুদ্ধার করতে পারেন।</p>
+            </div>
+            
+            <div class="mb-4">
+                <button id="refreshDeleted" class="bg-blue-500 text-white px-4 py-2 rounded-lg bangla-font">
+                    <i class="fas fa-sync-alt"></i> রিফ্রেশ
+                </button>
+            </div>
+            
+            <div id="deletedReceipts" class="receipt-grid">
+                <!-- Deleted receipts will be displayed here -->
+            </div>
+        </div>
+
+        <!-- Receipt Preview -->
+        <div id="receiptPreview" class="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center hidden z-50">
+            <div class="bg-white p-6 rounded-lg max-w-lg w-full mx-4 max-h-screen overflow-y-auto">
+                <div id="receiptContent">
+                    <!-- Receipt content will be generated here -->
+                </div>
+                <div class="action-buttons mt-6">
+                    <button id="printReceipt" class="action-btn bg-blue-500 text-white px-4 py-2 rounded-lg bangla-font">
+                        <i class="fas fa-print"></i> প্রিন্ট
+                    </button>
+                    <button id="downloadPDF" class="action-btn bg-green-500 text-white px-4 py-2 rounded-lg bangla-font">
+                        <i class="fas fa-download"></i> PDF
+                    </button>
+                    <button id="shareWhatsApp" class="action-btn bg-green-600 text-white px-4 py-2 rounded-lg bangla-font">
+                        <i class="fab fa-whatsapp"></i> WhatsApp
+                    </button>
+                    <button id="closeReceipt" class="action-btn bg-red-500 text-white px-4 py-2 rounded-lg bangla-font">
+                        <i class="fas fa-times"></i> বন্ধ করুন
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let API_URL = localStorage.getItem('apiUrl') || '';
+        let receipts = [];
+        let currentReceiptId = null;
+        let currentSerial = 1000;
+
+        // DOM elements
+        const apiUrlInput = document.getElementById('apiUrl');
+        const saveApiUrlBtn = document.getElementById('saveApiUrl');
+        const navTabs = document.querySelectorAll('.nav-tab');
+        const createReceiptSection = document.getElementById('createReceiptSection');
+        const deliverOrderSection = document.getElementById('deliverOrderSection');
+        const searchReceiptSection = document.getElementById('searchReceiptSection');
+        const historySection = document.getElementById('historySection');
+        const deletedSection = document.getElementById('deletedSection');
+        const clothesList = document.getElementById('clothesList');
+        const addClothBtn = document.getElementById('addClothBtn');
+        const generatePendingReceipt = document.getElementById('generatePendingReceipt');
+        const deliveryClothesList = document.getElementById('deliveryClothesList');
+        const receiptPreview = document.getElementById('receiptPreview');
+        const receiptContent = document.getElementById('receiptContent');
+        const closeReceipt = document.getElementById('closeReceipt');
+        const printReceipt = document.getElementById('printReceipt');
+        const downloadPDF = document.getElementById('downloadPDF');
+        const shareWhatsApp = document.getElementById('shareWhatsApp');
+        const searchPendingBtn = document.getElementById('searchPendingBtn');
+        const deliveryForm = document.getElementById('deliveryForm');
+        const generateDeliveryReceipt = document.getElementById('generateDeliveryReceipt');
+        const searchReceiptBtn = document.getElementById('searchReceiptBtn');
+        const searchResults = document.getElementById('searchResults');
+        const refreshHistory = document.getElementById('refreshHistory');
+        const receiptHistory = document.getElementById('receiptHistory');
+        const refreshDeleted = document.getElementById('refreshDeleted');
+        const deletedReceipts = document.getElementById('deletedReceipts');
+
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set API URL if available
+            apiUrlInput.value = API_URL;
+            
+            // Add first cloth input
+            addClothItem();
+            
+            // Tab switching
+            navTabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const tabName = tab.getAttribute('data-tab');
+                    switchTab(tabName);
+                });
+            });
+            
+            // Save API URL
+            saveApiUrlBtn.addEventListener('click', () => {
+                API_URL = apiUrlInput.value.trim();
+                localStorage.setItem('apiUrl', API_URL);
+                alert('API URL saved successfully!');
+            });
+            
+            // Add cloth item
+            addClothBtn.addEventListener('click', addClothItem);
+            
+            // Generate pending receipt
+            generatePendingReceipt.addEventListener('click', generatePendingReceiptHandler);
+            
+            // Close receipt preview
+            closeReceipt.addEventListener('click', () => receiptPreview.classList.add('hidden'));
+            
+            // Print receipt
+            printReceipt.addEventListener('click', printReceiptHandler);
+            
+            // Download PDF
+            downloadPDF.addEventListener('click', downloadPDFHandler);
+            
+            // Share via WhatsApp
+            shareWhatsApp.addEventListener('click', shareViaWhatsApp);
+            
+            // Search pending receipt
+            searchPendingBtn.addEventListener('click', searchPendingReceipt);
+            
+            // Generate delivery receipt
+            generateDeliveryReceipt.addEventListener('click', generateDeliveryReceiptHandler);
+            
+            // Search receipts
+            searchReceiptBtn.addEventListener('click', searchReceiptsHandler);
+            
+            // Refresh history
+            refreshHistory.addEventListener('click', loadReceiptHistory);
+            
+            // Refresh deleted
+            refreshDeleted.addEventListener('click', loadDeletedReceipts);
+            
+            // Load receipt history initially if API is configured
+            if (API_URL) {
+                loadReceiptHistory();
+                loadDeletedReceipts();
+                getNextSerialNumber();
+            }
+        });
+
+        // API Functions
+        async function makeApiCall(endpoint, method = 'GET', data = null) {
+            if (!API_URL) {
+                alert('Please configure the API URL first');
+                return null;
+            }
+            
+            try {
+                const url = `${API_URL}${endpoint}`;
+                const options = {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                };
+                
+                if (data && method !== 'GET') {
+                    options.body = JSON.stringify(data);
+                }
+                
+                const response = await fetch(url, options);
+                const result = await response.json();
+                
+                if (result.success) {
+                    return result.data;
+                } else {
+                    alert('API Error: ' + (result.message || 'Unknown error'));
+                    return null;
+                }
+            } catch (error) {
+                console.error('API Call Error:', error);
+                alert('Failed to connect to the server. Please check your API URL.');
+                return null;
+            }
+        }
+
+        async function getNextSerialNumber() {
+            const data = await makeApiCall('?action=getNextSerial');
+            if (data && data.nextSerial) {
+                currentSerial = data.nextSerial;
+            }
+        }
+
+        async function saveReceipt(receipt) {
+            return await makeApiCall('?action=saveReceipt', 'POST', receipt);
+        }
+
+        async function updateReceipt(receipt) {
+            return await makeApiCall('?action=updateReceipt', 'POST', receipt);
+        }
+
+        async function searchReceipts(query) {
+            return await makeApiCall(`?action=searchReceipts&query=${encodeURIComponent(query)}`);
+        }
+
+        async function getAllReceipts() {
+            return await makeApiCall('?action=getAllReceipts');
+        }
+
+        async function getDeletedReceipts() {
+            return await makeApiCall('?action=getDeletedReceipts');
+        }
+
+        async function deleteReceiptApi(receiptId) {
+            return await makeApiCall('?action=deleteReceipt', 'POST', { id: receiptId });
+        }
+
+        async function restoreReceiptApi(receiptId) {
+            return await makeApiCall('?action=restoreReceipt', 'POST', { id: receiptId });
+        }
+
+        // Switch between tabs
+        function switchTab(tab) {
+            createReceiptSection.classList.add('hidden');
+            deliverOrderSection.classList.add('hidden');
+            searchReceiptSection.classList.add('hidden');
+            historySection.classList.add('hidden');
+            deletedSection.classList.add('hidden');
+            
+            navTabs.forEach(t => t.classList.remove('active-tab'));
+            
+            if (tab === 'create') {
+                createReceiptSection.classList.remove('hidden');
+                document.querySelector('[data-tab="create"]').classList.add('active-tab');
+            } else if (tab === 'deliver') {
+                deliverOrderSection.classList.remove('hidden');
+                document.querySelector('[data-tab="deliver"]').classList.add('active-tab');
+            } else if (tab === 'search') {
+                searchReceiptSection.classList.remove('hidden');
+                document.querySelector('[data-tab="search"]').classList.add('active-tab');
+            } else if (tab === 'history') {
+                historySection.classList.remove('hidden');
+                document.querySelector('[data-tab="history"]').classList.add('active-tab');
+                loadReceiptHistory();
+            } else if (tab === 'deleted') {
+                deletedSection.classList.remove('hidden');
+                document.querySelector('[data-tab="deleted"]').classList.add('active-tab');
+                loadDeletedReceipts();
+            }
+        }
+
+        // Add cloth item to the list
+        function addClothItem() {
+            const clothItem = document.createElement('div');
+            clothItem.className = 'flex items-center mb-2';
+            clothItem.innerHTML = `
+                <input type="text" class="flex-grow px-3 py-2 border rounded-lg bangla-font" placeholder="কাপড়ের নাম লিখুন">
+                <button class="remove-cloth bg-red-500 text-white px-3 py-2 rounded-lg ml-2 bangla-font">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            clothesList.appendChild(clothItem);
+            
+            // Add event listener to remove button
+            clothItem.querySelector('.remove-cloth').addEventListener('click', function() {
+                if (clothesList.children.length > 1) {
+                    clothesList.removeChild(clothItem);
+                }
+            });
+        }
+
+        // Generate pending receipt
+        async function generatePendingReceiptHandler() {
+            if (!API_URL) {
+                alert('Please configure the API URL first');
+                return;
+            }
+            
+            const shopName = document.getElementById('shopName').value;
+            const customerName = document.getElementById('customerName').value;
+            const customerMobile = document.getElementById('customerMobile').value;
+            
+            if (!customerName) {
+                alert('গ্রাহকের নাম অবশ্যই দিতে হবে');
+                return;
+            }
+            
+            // Get clothes items
+            const clothes = [];
+            const clothInputs = clothesList.querySelectorAll('input');
+            clothInputs.forEach(input => {
+                if (input.value.trim() !== '') {
+                    clothes.push(input.value.trim());
+                }
+            });
+            
+            if (clothes.length === 0) {
+                alert('কমপক্ষে একটি কাপড়ের নাম দিতে হবে');
+                return;
+            }
+            
+            // Generate serial number
+            if (currentSerial === 1000) {
+                await getNextSerialNumber();
+            }
+            const serial = currentSerial;
+            currentSerial++;
+            
+            // Create receipt object
+            const receipt = {
+                id: Date.now(),
+                serial: serial,
+                shopName,
+                customerName,
+                customerMobile,
+                clothes: clothes.join(','),
+                status: 'Pending',
+                date: new Date().toLocaleString('bn-BD'),
+                deliveryDate: null,
+                prices: '',
+                total: 0,
+                additionalNote: '',
+                deleted: false,
+                deletedDate: null
+            };
+            
+            // Save to API
+            const saveButton = generatePendingReceipt;
+            const originalText = saveButton.innerHTML;
+            saveButton.innerHTML = '<span class="loading"></span> Saving...';
+            saveButton.disabled = true;
+            
+            const result = await saveReceipt(receipt);
+            
+            saveButton.innerHTML = originalText;
+            saveButton.disabled = false;
+            
+            if (result) {
+                // Show receipt
+                showReceipt(receipt);
+                
+                // Reset form
+                document.getElementById('customerName').value = '';
+                document.getElementById('customerMobile').value = '';
+                
+                // Reset clothes list
+                while (clothesList.firstChild) {
+                    clothesList.removeChild(clothesList.firstChild);
+                }
+                addClothItem();
+                
+                alert('রসিদ তৈরি হয়েছে! সিরিয়াল নম্বর: ' + serial);
+            }
+        }
+
+        // Show receipt in preview
+        function showReceipt(receipt) {
+            currentReceiptId = receipt.id;
+            
+            // Parse clothes and prices
+            const clothesArray = receipt.clothes.split(',');
+            const pricesArray = receipt.prices ? receipt.prices.split(',').map(p => parseFloat(p)) : [];
+            
+            let receiptHTML = `
+                <div class="receipt">
+                    <div class="receipt-header">
+                        <h2 class="text-xl font-bold bangla-font">${receipt.shopName}</h2>
+                        <p class="bangla-font">${receipt.date}</p>
+                        <p class="bangla-font">সিরিয়াল নম্বর: ${receipt.serial}</p>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <p class="bangla-font"><strong>গ্রাহকের নাম:</strong> ${receipt.customerName}</p>
+                        <p class="bangla-font"><strong>মোবাইল নম্বর:</strong> ${receipt.customerMobile || 'নাই'}</p>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <p class="font-bold bangla-font">কাপড়ের তালিকা:</p>
+            `;
+            
+            if (receipt.status === 'Pending') {
+                clothesArray.forEach(cloth => {
+                    receiptHTML += `<p class="bangla-font">- ${cloth}</p>`;
+                });
+            } else {
+                clothesArray.forEach((cloth, index) => {
+                    receiptHTML += `<p class="bangla-font">- ${cloth} - ৳${pricesArray[index] || 0}</p>`;
+                });
+            }
+            
+            receiptHTML += `
+                    </div>
+                    
+                    <div class="mb-4">
+                        <p class="bangla-font"><strong>স্ট্যাটাস:</strong> ${receipt.status === 'Pending' ? 'কাজ চলছে' : 'হস্তান্তর সম্পন্ন'}</p>
+            `;
+            
+            if (receipt.status === 'Delivered') {
+                receiptHTML += `
+                        <p class="bangla-font"><strong>হস্তান্তরের তারিখ:</strong> ${receipt.deliveryDate}</p>
+                        <p class="bangla-font"><strong>মোট মূল্য:</strong> ৳${receipt.total}</p>
+                `;
+                
+                if (receipt.additionalNote) {
+                    receiptHTML += `<p class="bangla-font"><strong>মন্তব্য:</strong> ${receipt.additionalNote}</p>`;
+                }
+            }
+            
+            receiptHTML += `
+                    </div>
+                    
+                    <div class="receipt-footer">
+                        <p class="bangla-font">ধন্যবাদান্তে, ${receipt.shopName}</p>
+                    </div>
+                </div>
+            `;
+            
+            receiptContent.innerHTML = receiptHTML;
+            receiptPreview.classList.remove('hidden');
+        }
+
+        // Print receipt
+        function printReceiptHandler() {
+            const receiptElement = document.getElementById('receiptContent');
+            const originalContents = document.body.innerHTML;
+            
+            document.body.innerHTML = receiptElement.innerHTML;
+            window.print();
+            document.body.innerHTML = originalContents;
+            location.reload();
+        }
+
+        // Download PDF
+        function downloadPDFHandler() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            const receiptElement = document.getElementById('receiptContent');
+            
+            // For demo purposes, we'll create a simple PDF
+            doc.setFontSize(18);
+            doc.text('Tailor Shop Receipt', 105, 15, { align: 'center' });
+            doc.setFontSize(12);
+            doc.text(`Serial: ${currentSerial}`, 20, 25);
+            doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 35);
+            
+            const receipt = receipts.find(r => r.id === currentReceiptId);
+            if (receipt) {
+                doc.text(`Customer: ${receipt.customerName}`, 20, 45);
+                doc.text(`Mobile: ${receipt.customerMobile || 'N/A'}`, 20, 55);
+                
+                let y = 65;
+                doc.text('Items:', 20, y);
+                y += 10;
+                
+                const clothesArray = receipt.clothes.split(',');
+                const pricesArray = receipt.prices ? receipt.prices.split(',').map(p => parseFloat(p)) : [];
+                
+                if (receipt.status === 'Pending') {
+                    clothesArray.forEach(cloth => {
+                        doc.text(`- ${cloth}`, 20, y);
+                        y += 7;
+                    });
+                } else {
+                    clothesArray.forEach((cloth, index) => {
+                        doc.text(`- ${cloth} - ৳${pricesArray[index] || 0}`, 20, y);
+                        y += 7;
+                    });
+                }
+                
+                y += 5;
+                doc.text(`Status: ${receipt.status === 'Pending' ? 'Pending' : 'Delivered'}`, 20, y);
+                
+                if (receipt.status === 'Delivered') {
+                    y += 10;
+                    doc.text(`Total: ৳${receipt.total}`, 20, y);
+                    y += 10;
+                    doc.text(`Delivery Date: ${receipt.deliveryDate}`, 20, y);
+                    
+                    if (receipt.additionalNote) {
+                        y += 10;
+                        doc.text(`Note: ${receipt.additionalNote}`, 20, y);
+                    }
+                }
+            }
+            
+            doc.save(`receipt_${currentSerial}.pdf`);
+        }
+
+        // Share via WhatsApp
+        async function shareViaWhatsApp() {
+            const receipt = receipts.find(r => r.id === currentReceiptId);
+            if (!receipt) return;
+            
+            // Create receipt image
+            const receiptElement = document.getElementById('receiptContent');
+            
+            html2canvas(receiptElement).then(canvas => {
+                canvas.toBlob(blob => {
+                    // For demo purposes, we'll just share text since file sharing requires a server
+                    let message = `*Tailor Shop Receipt*%0A`;
+                    message += `Serial: ${receipt.serial}%0A`;
+                    message += `Customer: ${receipt.customerName}%0A`;
+                    message += `Mobile: ${receipt.customerMobile || 'N/A'}%0A`;
+                    message += `Status: ${receipt.status}%0A`;
+                    message += `Date: ${receipt.date}%0A%0A`;
+                    
+                    message += `*Items:*%0A`;
+                    const clothesArray = receipt.clothes.split(',');
+                    const pricesArray = receipt.prices ? receipt.prices.split(',').map(p => parseFloat(p)) : [];
+                    
+                    if (receipt.status === 'Pending') {
+                        clothesArray.forEach(cloth => {
+                            message += `- ${cloth}%0A`;
+                        });
+                    } else {
+                        clothesArray.forEach((cloth, index) => {
+                            message += `- ${cloth} - ৳${pricesArray[index] || 0}%0A`;
+                        });
+                        message += `%0ATotal: ৳${receipt.total}%0A`;
+                    }
+                    
+                    if (receipt.status === 'Delivered' && receipt.additionalNote) {
+                        message += `%0ANote: ${receipt.additionalNote}%0A`;
+                    }
+                    
+                    message += `%0AThank you for your business!`;
+                    
+                    window.open(`https://wa.me/?text=${message}`, '_blank');
+                });
+            });
+        }
+
+        // Search pending receipt
+        async function searchPendingReceipt() {
+            if (!API_URL) {
+                alert('Please configure the API URL first');
+                return;
+            }
+            
+            const serial = document.getElementById('searchSerial').value;
+            
+            if (!serial) {
+                alert('সিরিয়াল নম্বর লিখুন');
+                return;
+            }
+            
+            const searchButton = searchPendingBtn;
+            const originalText = searchButton.innerHTML;
+            searchButton.innerHTML = '<span class="loading"></span> Searching...';
+            searchButton.disabled = true;
+            
+            const results = await searchReceipts(serial);
+            
+            searchButton.innerHTML = originalText;
+            searchButton.disabled = false;
+            
+            if (!results || results.length === 0) {
+                alert('এই সিরিয়াল নম্বরের কোনো রসিদ পাওয়া যায়নি');
+                return;
+            }
+            
+            const receipt = results.find(r => r.status === 'Pending' && !r.deleted);
+            
+            if (!receipt) {
+                alert('এই সিরিয়াল নম্বরের কোনো পেন্ডিং রসিদ পাওয়া যায়নি');
+                return;
+            }
+            
+            // Show delivery form
+            document.getElementById('deliveryCustomerName').textContent = receipt.customerName;
+            document.getElementById('deliveryCustomerMobile').textContent = receipt.customerMobile || 'নাই';
+            
+            // Create clothes list with price inputs
+            deliveryClothesList.innerHTML = '';
+            const clothesArray = receipt.clothes.split(',');
+            clothesArray.forEach((cloth, index) => {
+                const clothItem = document.createElement('div');
+                clothItem.className = 'flex items-center mb-2';
+                clothItem.innerHTML = `
+                    <label class="w-1/2 bangla-font">${cloth}</label>
+                    <input type="number" class="price-input w-1/2 px-3 py-2 border rounded-lg" placeholder="মূল্য লিখুন" data-index="${index}">
+                `;
+                deliveryClothesList.appendChild(clothItem);
+            });
+            
+            deliveryForm.classList.remove('hidden');
+            
+            // Add event listeners to price inputs for auto calculation
+            const priceInputs = deliveryClothesList.querySelectorAll('.price-input');
+            priceInputs.forEach(input => {
+                input.addEventListener('input', calculateTotal);
+            });
+        }
+
+        // Calculate total amount
+        function calculateTotal() {
+            let total = 0;
+            const priceInputs = deliveryClothesList.querySelectorAll('.price-input');
+            
+            priceInputs.forEach(input => {
+                const price = parseFloat(input.value) || 0;
+                total += price;
+            });
+            
+            document.getElementById('totalAmount').textContent = total;
+        }
+
+        // Generate delivery receipt
+        async function generateDeliveryReceiptHandler() {
+            if (!API_URL) {
+                alert('Please configure the API URL first');
+                return;
+            }
+            
+            const serial = document.getElementById('searchSerial').value;
+            const additionalNote = document.getElementById('additionalNote').value;
+            
+            const searchButton = generateDeliveryReceipt;
+            const originalText = searchButton.innerHTML;
+            searchButton.innerHTML = '<span class="loading"></span> Processing...';
+            searchButton.disabled = true;
+            
+            const results = await searchReceipts(serial);
+            
+            if (!results || results.length === 0) {
+                alert('রসিদ পাওয়া যায়নি');
+                searchButton.innerHTML = originalText;
+                searchButton.disabled = false;
+                return;
+            }
+            
+            const receiptIndex = results.findIndex(r => r.serial == serial && r.status === 'Pending' && !r.deleted);
+            
+            if (receiptIndex === -1) {
+                alert('রসিদ পাওয়া যায়নি');
+                searchButton.innerHTML = originalText;
+                searchButton.disabled = false;
+                return;
+            }
+            
+            const receipt = results[receiptIndex];
+            
+            // Get prices
+            const priceInputs = deliveryClothesList.querySelectorAll('.price-input');
+            const prices = [];
+            let allPricesFilled = true;
+            
+            priceInputs.forEach(input => {
+                const price = parseFloat(input.value);
+                if (isNaN(price)) {
+                    allPricesFilled = false;
+                } else {
+                    prices.push(price);
+                }
+            });
+            
+            if (!allPricesFilled) {
+                alert('সব কাপড়ের মূল্য লিখুন');
+                searchButton.innerHTML = originalText;
+                searchButton.disabled = false;
+                return;
+            }
+            
+            // Calculate total
+            const total = prices.reduce((sum, price) => sum + price, 0);
+            
+            // Update receipt
+            receipt.status = 'Delivered';
+            receipt.prices = prices.join(',');
+            receipt.total = total;
+            receipt.deliveryDate = new Date().toLocaleString('bn-BD');
+            receipt.additionalNote = additionalNote;
+            
+            // Save to API
+            const result = await updateReceipt(receipt);
+            
+            searchButton.innerHTML = originalText;
+            searchButton.disabled = false;
+            
+            if (result) {
+                // Show receipt
+                showReceipt(receipt);
+                
+                // Reset form
+                document.getElementById('searchSerial').value = '';
+                document.getElementById('additionalNote').value = '';
+                deliveryForm.classList.add('hidden');
+                
+                // Reload history
+                loadReceiptHistory();
+                
+                alert('হস্তান্তর রসিদ তৈরি হয়েছে!');
+            }
+        }
+
+        // Search receipts
+        async function searchReceiptsHandler() {
+            if (!API_URL) {
+                alert('Please configure the API URL first');
+                return;
+            }
+            
+            const query = document.getElementById('searchQuery').value.toLowerCase();
+            
+            if (!query) {
+                alert('সার্চ করার জন্য কিছু লিখুন');
+                return;
+            }
+            
+            const searchButton = searchReceiptBtn;
+            const originalText = searchButton.innerHTML;
+            searchButton.innerHTML = '<span class="loading"></span> Searching...';
+            searchButton.disabled = true;
+            
+            const results = await searchReceipts(query);
+            
+            searchButton.innerHTML = originalText;
+            searchButton.disabled = false;
+            
+            if (!results || results.length === 0) {
+                searchResults.innerHTML = '<p class="bangla-font text-center">কোনো রসিদ পাওয়া যায়নি</p>';
+                return;
+            }
+            
+            let resultsHTML = '<h3 class="text-xl font-bold mb-4 bangla-font">খুঁজে পাওয়া রসিদসমূহ</h3>';
+            
+            results.forEach(receipt => {
+                resultsHTML += `
+                    <div class="receipt-card">
+                        <p class="bangla-font"><strong>সিরিয়াল নম্বর:</strong> ${receipt.serial}</p>
+                        <p class="bangla-font"><strong>গ্রাহকের নাম:</strong> ${receipt.customerName}</p>
+                        <p class="bangla-font"><strong>মোবাইল নম্বর:</strong> ${receipt.customerMobile || 'নাই'}</p>
+                        <p class="bangla-font"><strong>স্ট্যাটাস:</strong> 
+                            <span class="status-badge ${receipt.status === 'Pending' ? 'status-pending' : 'status-delivered'}">
+                                ${receipt.status === 'Pending' ? 'কাজ চলছে' : 'হস্তান্তর সম্পন্ন'}
+                            </span>
+                        </p>
+                        <p class="bangla-font"><strong>তারিখ:</strong> ${receipt.date}</p>
+                        <div class="action-buttons mt-3">
+                            <button class="view-receipt bg-blue-500 text-white px-3 py-1 rounded-lg bangla-font" data-id="${receipt.id}">
+                                <i class="fas fa-eye"></i> দেখুন
+                            </button>
+                            ${receipt.status === 'Pending' ? `
+                            <button class="delete-receipt bg-red-500 text-white px-3 py-1 rounded-lg bangla-font" data-id="${receipt.id}">
+                                <i class="fas fa-trash"></i> ডিলিট
+                            </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            searchResults.innerHTML = resultsHTML;
+            
+            // Add event listeners to view buttons
+            const viewButtons = searchResults.querySelectorAll('.view-receipt');
+            viewButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const receiptId = parseInt(this.getAttribute('data-id'));
+                    const receipt = results.find(r => r.id === receiptId);
+                    showReceipt(receipt);
+                });
+            });
+            
+            // Add event listeners to delete buttons
+            const deleteButtons = searchResults.querySelectorAll('.delete-receipt');
+            deleteButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const receiptId = parseInt(this.getAttribute('data-id'));
+                    deleteReceipt(receiptId);
+                });
+            });
+        }
+
+        // Load receipt history
+        async function loadReceiptHistory() {
+            if (!API_URL) {
+                receiptHistory.innerHTML = '<p class="bangla-font text-center">Please configure API URL first</p>';
+                return;
+            }
+            
+            const refreshButton = refreshHistory;
+            const originalText = refreshButton.innerHTML;
+            refreshButton.innerHTML = '<span class="loading"></span> Loading...';
+            refreshButton.disabled = true;
+            
+            const activeReceipts = await getAllReceipts();
+            
+            refreshButton.innerHTML = originalText;
+            refreshButton.disabled = false;
+            
+            if (!activeReceipts || activeReceipts.length === 0) {
+                receiptHistory.innerHTML = '<p class="bangla-font text-center">কোনো রসিদ পাওয়া যায়নি</p>';
+                return;
+            }
+            
+            receipts = activeReceipts;
+            
+            // Sort receipts by date (newest first)
+            const sortedReceipts = [...activeReceipts].sort((a, b) => b.id - a.id);
+            
+            let historyHTML = '';
+            
+            sortedReceipts.forEach(receipt => {
+                historyHTML += `
+                    <div class="receipt-card">
+                        <p class="bangla-font"><strong>সিরিয়াল নম্বর:</strong> ${receipt.serial}</p>
+                        <p class="bangla-font"><strong>গ্রাহকের নাম:</strong> ${receipt.customerName}</p>
+                        <p class="bangla-font"><strong>মোবাইল নম্বর:</strong> ${receipt.customerMobile || 'নাই'}</p>
+                        <p class="bangla-font"><strong>স্ট্যাটাস:</strong> 
+                            <span class="status-badge ${receipt.status === 'Pending' ? 'status-pending' : 'status-delivered'}">
+                                ${receipt.status === 'Pending' ? 'কাজ চলছে' : 'হস্তান্তর সম্পন্ন'}
+                            </span>
+                        </p>
+                        <p class="bangla-font"><strong>তারিখ:</strong> ${receipt.date}</p>
+                        ${receipt.status === 'Delivered' ? `<p class="bangla-font"><strong>মোট মূল্য:</strong> ৳${receipt.total}</p>` : ''}
+                        <div class="action-buttons mt-3">
+                            <button class="view-receipt bg-blue-500 text-white px-3 py-1 rounded-lg bangla-font" data-id="${receipt.id}">
+                                <i class="fas fa-eye"></i> দেখুন
+                            </button>
+                            ${receipt.status === 'Pending' ? `
+                            <button class="delete-receipt bg-red-500 text-white px-3 py-1 rounded-lg bangla-font" data-id="${receipt.id}">
+                                <i class="fas fa-trash"></i> ডিলিট
+                            </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            receiptHistory.innerHTML = historyHTML;
+            
+            // Add event listeners to view buttons
+            const viewButtons = receiptHistory.querySelectorAll('.view-receipt');
+            viewButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const receiptId = parseInt(this.getAttribute('data-id'));
+                    const receipt = activeReceipts.find(r => r.id === receiptId);
+                    showReceipt(receipt);
+                });
+            });
+            
+            // Add event listeners to delete buttons
+            const deleteButtons = receiptHistory.querySelectorAll('.delete-receipt');
+            deleteButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const receiptId = parseInt(this.getAttribute('data-id'));
+                    deleteReceipt(receiptId);
+                });
+            });
+        }
+
+        // Load deleted receipts
+        async function loadDeletedReceipts() {
+            if (!API_URL) {
+                deletedReceipts.innerHTML = '<p class="bangla-font text-center">Please configure API URL first</p>';
+                return;
+            }
+            
+            const refreshButton = refreshDeleted;
+            const originalText = refreshButton.innerHTML;
+            refreshButton.innerHTML = '<span class="loading"></span> Loading...';
+            refreshButton.disabled = true;
+            
+            const deletedReceiptsList = await getDeletedReceipts();
+            
+            refreshButton.innerHTML = originalText;
+            refreshButton.disabled = false;
+            
+            if (!deletedReceiptsList || deletedReceiptsList.length === 0) {
+                deletedReceipts.innerHTML = '<p class="bangla-font text-center">কোনো ডিলিট করা রসিদ পাওয়া যায়নি</p>';
+                return;
+            }
+            
+            // Sort receipts by date (newest first)
+            const sortedReceipts = [...deletedReceiptsList].sort((a, b) => b.id - a.id);
+            
+            let historyHTML = '';
+            
+            sortedReceipts.forEach(receipt => {
+                historyHTML += `
+                    <div class="receipt-card">
+                        <p class="bangla-font"><strong>সিরিয়াল নম্বর:</strong> ${receipt.serial}</p>
+                        <p class="bangla-font"><strong>গ্রাহকের নাম:</strong> ${receipt.customerName}</p>
+                        <p class="bangla-font"><strong>মোবাইল নম্বর:</strong> ${receipt.customerMobile || 'নাই'}</p>
+                        <p class="bangla-font"><strong>স্ট্যাটাস:</strong> 
+                            <span class="status-badge status-deleted">
+                                ডিলিট করা
+                            </span>
+                        </p>
+                        <p class="bangla-font"><strong>তারিখ:</strong> ${receipt.date}</p>
+                        <p class="bangla-font"><strong>ডিলিটের তারিখ:</极端 ${receipt.deletedDate}</p>
+                        <div class="action-buttons mt-3">
+                            <button class="view-receipt bg-blue-500 text-white px-3 py-1 rounded-lg bangla-font" data-id="${receipt.id}">
+                                <i class="fas fa-eye"></i> দেখুন
+                            </button>
+                            <button class="restore-receipt bg-green-500 text-white px-3 py-1 rounded-lg bangla-font" data-id="${receipt.id}">
+                                <i class="fas fa-trash-restore"></i> পুনরুদ্ধার
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            deletedReceipts.innerHTML = historyHTML;
+            
+            // Add event listeners to view buttons
+            const viewButtons = deletedReceipts.querySelectorAll('.view-receipt');
+            viewButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const receiptId = parseInt(this.getAttribute('data-id'));
+                    const receipt = deletedReceiptsList.find(r => r.id === receiptId);
+                    showReceipt(receipt);
+                });
+            });
+            
+            // Add event listeners to restore buttons
+            const restoreButtons = deletedReceipts.querySelectorAll('.restore-receipt');
+            restoreButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const receiptId = parseInt(this.getAttribute('data-id'));
+                    restoreReceipt(receiptId);
+                });
+            });
+        }
+
+        // Delete receipt
+        async function deleteReceipt(receiptId) {
+            if (!API_URL) {
+                alert('Please configure the API URL first');
+                return;
+            }
+            
+            if (!confirm('আপনি কি এই রসিদ ডিলিট করতে চান?')) return;
+            
+            const result = await deleteReceiptApi(receiptId);
+            
+            if (result) {
+                alert('রসিদ ডিলিট করা হয়েছে');
+                
+                // Reload history
+                loadReceiptHistory();
+                loadDeletedReceipts();
+            }
+        }
+
+        // Restore receipt
+        async function restoreReceipt(receiptId) {
+            if (!API_URL) {
+                alert('Please configure the API URL first');
+                return;
+            }
+            
+            const result = await restoreReceiptApi(receiptId);
+            
+            if (result) {
+                alert('রসিদ পুনরুদ্ধার করা হয়েছে');
+                
+                // Reload history
+                loadReceiptHistory();
+                loadDeletedReceipts();
+            }
+        }
+    </script>
+</body>
+</html>
