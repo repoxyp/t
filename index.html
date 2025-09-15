@@ -7,8 +7,6 @@
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=SolaimanLipi&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         body {
             font-family: 'SolaimanLipi', Arial, sans-serif;
@@ -162,18 +160,6 @@
             display: flex;
             align-items: center;
         }
-        .loading {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(255,255,255,.3);
-            border-radius: 50%;
-            border-top-color: #fff;
-            animation: spin 1s ease-in-out infinite;
-        }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -182,19 +168,6 @@
             <h1 class="text-3xl font-bold bangla-font text-blue-800">দর্জি দোকান রসিদ ব্যবস্থাপনা</h1>
             <p class="text-lg bangla-font text-blue-600">কাপড় জমা ও হস্তান্তর রসিদ ব্যবস্থাপনা সিস্টেম</p>
         </header>
-
-        <!-- API Configuration -->
-        <div class="bg-white p-6 rounded-lg shadow-md mb-8">
-            <h2 class="text-xl font-bold mb-4 text-blue-800">Google Sheets API Configuration</h2>
-            <div class="mb-4">
-                <label class="block text-gray-700 bangla-font mb-2" for="apiUrl">Google Apps Script Web App URL</label>
-                <input type="text" id="apiUrl" class="w-full px-4 py-2 border rounded-lg" placeholder="https://script.google.com/macros/s/..." value="">
-                <p class="text-sm text-gray-500 mt-1">Enter your Google Apps Script Web App URL here</p>
-            </div>
-            <button id="saveApiUrl" class="bg-blue-500 text-white px-4 py-2 rounded-lg bangla-font">
-                Save API URL
-            </button>
-        </div>
 
         <!-- Feature Overview -->
         <div class="bg-white p-6 rounded-lg shadow-md mb-8">
@@ -306,7 +279,7 @@
             <h2 class="form-title bangla-font">অর্ডার হস্তান্তর করুন</h2>
             
             <div class="instructions">
-                <p class="bangla-font">গ্রাহককে কাপড় হস্তান্তর করার সময় এই ফর্মটি ব্যবহার করুন। পেন্ডিং অর্ডারের সিরিয়াল নম্বর দিয়ে খুঁজুন এবং মূল্য যোগ করুন。</p>
+                <p class="bangla-font">গ্রাহককে কাপড় হস্তান্তর করার সময় এই ফর্মটি ব্যবহার করুন। পেন্ডিং অর্ডারের সিরিয়াল নম্বর দিয়ে খুঁজুন এবং মূল্য যোগ করুন।</p>
             </div>
             
             <div class="mb-4">
@@ -438,14 +411,11 @@
 
     <script>
         // Global variables
-        let API_URL = localStorage.getItem('apiUrl') || '';
-        let receipts = [];
+        let receipts = JSON.parse(localStorage.getItem('tailorReceipts')) || [];
         let currentReceiptId = null;
-        let currentSerial = 1000;
+        let currentSerial = parseInt(localStorage.getItem('lastSerial')) || 1000;
 
         // DOM elements
-        const apiUrlInput = document.getElementById('apiUrl');
-        const saveApiUrlBtn = document.getElementById('saveApiUrl');
         const navTabs = document.querySelectorAll('.nav-tab');
         const createReceiptSection = document.getElementById('createReceiptSection');
         const deliverOrderSection = document.getElementById('deliverOrderSection');
@@ -474,9 +444,6 @@
 
         // Initialize the app
         document.addEventListener('DOMContentLoaded', function() {
-            // Set API URL if available
-            apiUrlInput.value = API_URL;
-            
             // Add first cloth input
             addClothItem();
             
@@ -486,13 +453,6 @@
                     const tabName = tab.getAttribute('data-tab');
                     switchTab(tabName);
                 });
-            });
-            
-            // Save API URL
-            saveApiUrlBtn.addEventListener('click', () => {
-                API_URL = apiUrlInput.value.trim();
-                localStorage.setItem('apiUrl', API_URL);
-                alert('API URL saved successfully!');
             });
             
             // Add cloth item
@@ -528,84 +488,10 @@
             // Refresh deleted
             refreshDeleted.addEventListener('click', loadDeletedReceipts);
             
-            // Load receipt history initially if API is configured
-            if (API_URL) {
-                loadReceiptHistory();
-                loadDeletedReceipts();
-                getNextSerialNumber();
-            }
+            // Load receipt history initially
+            loadReceiptHistory();
+            loadDeletedReceipts();
         });
-
-        // API Functions
-        async function makeApiCall(endpoint, method = 'GET', data = null) {
-            if (!API_URL) {
-                alert('Please configure the API URL first');
-                return null;
-            }
-            
-            try {
-                const url = `${API_URL}${endpoint}`;
-                const options = {
-                    method: method,
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                };
-                
-                if (data && method !== 'GET') {
-                    options.body = JSON.stringify(data);
-                }
-                
-                const response = await fetch(url, options);
-                const result = await response.json();
-                
-                if (result.success) {
-                    return result.data;
-                } else {
-                    alert('API Error: ' + (result.message || 'Unknown error'));
-                    return null;
-                }
-            } catch (error) {
-                console.error('API Call Error:', error);
-                alert('Failed to connect to the server. Please check your API URL.');
-                return null;
-            }
-        }
-
-        async function getNextSerialNumber() {
-            const data = await makeApiCall('?action=getNextSerial');
-            if (data && data.nextSerial) {
-                currentSerial = data.nextSerial;
-            }
-        }
-
-        async function saveReceipt(receipt) {
-            return await makeApiCall('?action=saveReceipt', 'POST', receipt);
-        }
-
-        async function updateReceipt(receipt) {
-            return await makeApiCall('?action=updateReceipt', 'POST', receipt);
-        }
-
-        async function searchReceipts(query) {
-            return await makeApiCall(`?action=searchReceipts&query=${encodeURIComponent(query)}`);
-        }
-
-        async function getAllReceipts() {
-            return await makeApiCall('?action=getAllReceipts');
-        }
-
-        async function getDeletedReceipts() {
-            return await makeApiCall('?action=getDeletedReceipts');
-        }
-
-        async function deleteReceiptApi(receiptId) {
-            return await makeApiCall('?action=deleteReceipt', 'POST', { id: receiptId });
-        }
-
-        async function restoreReceiptApi(receiptId) {
-            return await makeApiCall('?action=restoreReceipt', 'POST', { id: receiptId });
-        }
 
         // Switch between tabs
         function switchTab(tab) {
@@ -658,12 +544,7 @@
         }
 
         // Generate pending receipt
-        async function generatePendingReceiptHandler() {
-            if (!API_URL) {
-                alert('Please configure the API URL first');
-                return;
-            }
-            
+        function generatePendingReceiptHandler() {
             const shopName = document.getElementById('shopName').value;
             const customerName = document.getElementById('customerName').value;
             const customerMobile = document.getElementById('customerMobile').value;
@@ -688,66 +569,50 @@
             }
             
             // Generate serial number
-            if (currentSerial === 1000) {
-                await getNextSerialNumber();
-            }
-            const serial = currentSerial;
             currentSerial++;
+            localStorage.setItem('lastSerial', currentSerial);
             
             // Create receipt object
             const receipt = {
                 id: Date.now(),
-                serial: serial,
+                serial: currentSerial,
                 shopName,
                 customerName,
                 customerMobile,
-                clothes: clothes.join(','),
+                clothes,
                 status: 'Pending',
                 date: new Date().toLocaleString('bn-BD'),
                 deliveryDate: null,
-                prices: '',
+                prices: [],
                 total: 0,
                 additionalNote: '',
                 deleted: false,
                 deletedDate: null
             };
             
-            // Save to API
-            const saveButton = generatePendingReceipt;
-            const originalText = saveButton.innerHTML;
-            saveButton.innerHTML = '<span class="loading"></span> Saving...';
-            saveButton.disabled = true;
+            // Save to storage
+            receipts.push(receipt);
+            localStorage.setItem('tailorReceipts', JSON.stringify(receipts));
             
-            const result = await saveReceipt(receipt);
+            // Show receipt
+            showReceipt(receipt);
             
-            saveButton.innerHTML = originalText;
-            saveButton.disabled = false;
+            // Reset form
+            document.getElementById('customerName').value = '';
+            document.getElementById('customerMobile').value = '';
             
-            if (result) {
-                // Show receipt
-                showReceipt(receipt);
-                
-                // Reset form
-                document.getElementById('customerName').value = '';
-                document.getElementById('customerMobile').value = '';
-                
-                // Reset clothes list
-                while (clothesList.firstChild) {
-                    clothesList.removeChild(clothesList.firstChild);
-                }
-                addClothItem();
-                
-                alert('রসিদ তৈরি হয়েছে! সিরিয়াল নম্বর: ' + serial);
+            // Reset clothes list
+            while (clothesList.firstChild) {
+                clothesList.removeChild(clothesList.firstChild);
             }
+            addClothItem();
+            
+            alert('রসিদ তৈরি হয়েছে! সিরিয়াল নম্বর: ' + currentSerial);
         }
 
         // Show receipt in preview
         function showReceipt(receipt) {
             currentReceiptId = receipt.id;
-            
-            // Parse clothes and prices
-            const clothesArray = receipt.clothes.split(',');
-            const pricesArray = receipt.prices ? receipt.prices.split(',').map(p => parseFloat(p)) : [];
             
             let receiptHTML = `
                 <div class="receipt">
@@ -767,12 +632,12 @@
             `;
             
             if (receipt.status === 'Pending') {
-                clothesArray.forEach(cloth => {
+                receipt.clothes.forEach(cloth => {
                     receiptHTML += `<p class="bangla-font">- ${cloth}</p>`;
                 });
             } else {
-                clothesArray.forEach((cloth, index) => {
-                    receiptHTML += `<p class="bangla-font">- ${cloth} - ৳${pricesArray[index] || 0}</p>`;
+                receipt.clothes.forEach((cloth, index) => {
+                    receiptHTML += `<p class="bangla-font">- ${cloth} - ৳${receipt.prices[index]}</p>`;
                 });
             }
             
@@ -841,17 +706,14 @@
                 doc.text('Items:', 20, y);
                 y += 10;
                 
-                const clothesArray = receipt.clothes.split(',');
-                const pricesArray = receipt.prices ? receipt.prices.split(',').map(p => parseFloat(p)) : [];
-                
                 if (receipt.status === 'Pending') {
-                    clothesArray.forEach(cloth => {
+                    receipt.clothes.forEach(cloth => {
                         doc.text(`- ${cloth}`, 20, y);
                         y += 7;
                     });
                 } else {
-                    clothesArray.forEach((cloth, index) => {
-                        doc.text(`- ${cloth} - ৳${pricesArray[index] || 0}`, 20, y);
+                    receipt.clothes.forEach((cloth, index) => {
+                        doc.text(`- ${cloth} - ৳${receipt.prices[index]}`, 20, y);
                         y += 7;
                     });
                 }
@@ -876,56 +738,40 @@
         }
 
         // Share via WhatsApp
-        async function shareViaWhatsApp() {
+        function shareViaWhatsApp() {
             const receipt = receipts.find(r => r.id === currentReceiptId);
             if (!receipt) return;
             
-            // Create receipt image
-            const receiptElement = document.getElementById('receiptContent');
+            let message = `*Tailor Shop Receipt*%0A`;
+            message += `Serial: ${receipt.serial}%0A`;
+            message += `Customer: ${receipt.customerName}%0A`;
+            message += `Mobile: ${receipt.customerMobile || 'N/A'}%0A`;
+            message += `Status: ${receipt.status}%0A`;
+            message += `Date: ${receipt.date}%0A%0A`;
             
-            html2canvas(receiptElement).then(canvas => {
-                canvas.toBlob(blob => {
-                    // For demo purposes, we'll just share text since file sharing requires a server
-                    let message = `*Tailor Shop Receipt*%0A`;
-                    message += `Serial: ${receipt.serial}%0A`;
-                    message += `Customer: ${receipt.customerName}%0A`;
-                    message += `Mobile: ${receipt.customerMobile || 'N/A'}%0A`;
-                    message += `Status: ${receipt.status}%0A`;
-                    message += `Date: ${receipt.date}%0A%0A`;
-                    
-                    message += `*Items:*%0A`;
-                    const clothesArray = receipt.clothes.split(',');
-                    const pricesArray = receipt.prices ? receipt.prices.split(',').map(p => parseFloat(p)) : [];
-                    
-                    if (receipt.status === 'Pending') {
-                        clothesArray.forEach(cloth => {
-                            message += `- ${cloth}%0A`;
-                        });
-                    } else {
-                        clothesArray.forEach((cloth, index) => {
-                            message += `- ${cloth} - ৳${pricesArray[index] || 0}%0A`;
-                        });
-                        message += `%0ATotal: ৳${receipt.total}%0A`;
-                    }
-                    
-                    if (receipt.status === 'Delivered' && receipt.additionalNote) {
-                        message += `%0ANote: ${receipt.additionalNote}%0A`;
-                    }
-                    
-                    message += `%0AThank you for your business!`;
-                    
-                    window.open(`https://wa.me/?text=${message}`, '_blank');
+            message += `*Items:*%0A`;
+            if (receipt.status === 'Pending') {
+                receipt.clothes.forEach(cloth => {
+                    message += `- ${cloth}%0A`;
                 });
-            });
+            } else {
+                receipt.clothes.forEach((cloth, index) => {
+                    message += `- ${cloth} - ৳${receipt.prices[index]}%0A`;
+                });
+                message += `%0ATotal: ৳${receipt.total}%0A`;
+            }
+            
+            if (receipt.status === 'Delivered' && receipt.additionalNote) {
+                message += `%0ANote: ${receipt.additionalNote}%0A`;
+            }
+            
+            message += `%0AThank you for your business!`;
+            
+            window.open(`https://wa.me/?text=${message}`, '_blank');
         }
 
         // Search pending receipt
-        async function searchPendingReceipt() {
-            if (!API_URL) {
-                alert('Please configure the API URL first');
-                return;
-            }
-            
+        function searchPendingReceipt() {
             const serial = document.getElementById('searchSerial').value;
             
             if (!serial) {
@@ -933,25 +779,10 @@
                 return;
             }
             
-            const searchButton = searchPendingBtn;
-            const originalText = searchButton.innerHTML;
-            searchButton.innerHTML = '<span class="loading"></span> Searching...';
-            searchButton.disabled = true;
-            
-            const results = await searchReceipts(serial);
-            
-            searchButton.innerHTML = originalText;
-            searchButton.disabled = false;
-            
-            if (!results || results.length === 0) {
-                alert('এই সিরিয়াল নম্বরের কোনো রসিদ পাওয়া যায়নি');
-                return;
-            }
-            
-            const receipt = results.find(r => r.status === 'Pending' && !r.deleted);
+            const receipt = receipts.find(r => r.serial == serial && r.status === 'Pending' && !r.deleted);
             
             if (!receipt) {
-                alert('এই সিরিয়াল নম্বরের কোনো পেন্ডিং রসিদ পাওয়া যায়নি');
+                alert('এই সিরিয়াল নম্বরের কোনো রসিদ পাওয়া যায়নি');
                 return;
             }
             
@@ -961,8 +792,7 @@
             
             // Create clothes list with price inputs
             deliveryClothesList.innerHTML = '';
-            const clothesArray = receipt.clothes.split(',');
-            clothesArray.forEach((cloth, index) => {
+            receipt.clothes.forEach((cloth, index) => {
                 const clothItem = document.createElement('div');
                 clothItem.className = 'flex items-center mb-2';
                 clothItem.innerHTML = `
@@ -995,39 +825,16 @@
         }
 
         // Generate delivery receipt
-        async function generateDeliveryReceiptHandler() {
-            if (!API_URL) {
-                alert('Please configure the API URL first');
-                return;
-            }
-            
+        function generateDeliveryReceiptHandler() {
             const serial = document.getElementById('searchSerial').value;
             const additionalNote = document.getElementById('additionalNote').value;
             
-            const searchButton = generateDeliveryReceipt;
-            const originalText = searchButton.innerHTML;
-            searchButton.innerHTML = '<span class="loading"></span> Processing...';
-            searchButton.disabled = true;
-            
-            const results = await searchReceipts(serial);
-            
-            if (!results || results.length === 0) {
-                alert('রসিদ পাওয়া যায়নি');
-                searchButton.innerHTML = originalText;
-                searchButton.disabled = false;
-                return;
-            }
-            
-            const receiptIndex = results.findIndex(r => r.serial == serial && r.status === 'Pending' && !r.deleted);
+            const receiptIndex = receipts.findIndex(r => r.serial == serial && r.status === 'Pending' && !r.deleted);
             
             if (receiptIndex === -1) {
                 alert('রসিদ পাওয়া যায়নি');
-                searchButton.innerHTML = originalText;
-                searchButton.disabled = false;
                 return;
             }
-            
-            const receipt = results[receiptIndex];
             
             // Get prices
             const priceInputs = deliveryClothesList.querySelectorAll('.price-input');
@@ -1045,8 +852,6 @@
             
             if (!allPricesFilled) {
                 alert('সব কাপড়ের মূল্য লিখুন');
-                searchButton.innerHTML = originalText;
-                searchButton.disabled = false;
                 return;
             }
             
@@ -1054,41 +859,31 @@
             const total = prices.reduce((sum, price) => sum + price, 0);
             
             // Update receipt
-            receipt.status = 'Delivered';
-            receipt.prices = prices.join(',');
-            receipt.total = total;
-            receipt.deliveryDate = new Date().toLocaleString('bn-BD');
-            receipt.additionalNote = additionalNote;
+            receipts[receiptIndex].status = 'Delivered';
+            receipts[receiptIndex].prices = prices;
+            receipts[receiptIndex].total = total;
+            receipts[receiptIndex].deliveryDate = new Date().toLocaleString('bn-BD');
+            receipts[receiptIndex].additionalNote = additionalNote;
             
-            // Save to API
-            const result = await updateReceipt(receipt);
+            // Save to storage
+            localStorage.setItem('tailorReceipts', JSON.stringify(receipts));
             
-            searchButton.innerHTML = originalText;
-            searchButton.disabled = false;
+            // Show receipt
+            showReceipt(receipts[receiptIndex]);
             
-            if (result) {
-                // Show receipt
-                showReceipt(receipt);
-                
-                // Reset form
-                document.getElementById('searchSerial').value = '';
-                document.getElementById('additionalNote').value = '';
-                deliveryForm.classList.add('hidden');
-                
-                // Reload history
-                loadReceiptHistory();
-                
-                alert('হস্তান্তর রসিদ তৈরি হয়েছে!');
-            }
+            // Reset form
+            document.getElementById('searchSerial').value = '';
+            document.getElementById('additionalNote').value = '';
+            deliveryForm.classList.add('hidden');
+            
+            // Reload history
+            loadReceiptHistory();
+            
+            alert('হস্তান্তর রসিদ তৈরি হয়েছে!');
         }
 
         // Search receipts
-        async function searchReceiptsHandler() {
-            if (!API_URL) {
-                alert('Please configure the API URL first');
-                return;
-            }
-            
+        function searchReceiptsHandler() {
             const query = document.getElementById('searchQuery').value.toLowerCase();
             
             if (!query) {
@@ -1096,17 +891,14 @@
                 return;
             }
             
-            const searchButton = searchReceiptBtn;
-            const originalText = searchButton.innerHTML;
-            searchButton.innerHTML = '<span class="loading"></span> Searching...';
-            searchButton.disabled = true;
+            const results = receipts.filter(r => 
+                (r.serial == query || 
+                r.customerName.toLowerCase().includes(query) || 
+                (r.customerMobile && r.customerMobile.includes(query))) &&
+                !r.deleted
+            );
             
-            const results = await searchReceipts(query);
-            
-            searchButton.innerHTML = originalText;
-            searchButton.disabled = false;
-            
-            if (!results || results.length === 0) {
+            if (results.length === 0) {
                 searchResults.innerHTML = '<p class="bangla-font text-center">কোনো রসিদ পাওয়া যায়নি</p>';
                 return;
             }
@@ -1146,7 +938,7 @@
             viewButtons.forEach(button => {
                 button.addEventListener('click', function() {
                     const receiptId = parseInt(this.getAttribute('data-id'));
-                    const receipt = results.find(r => r.id === receiptId);
+                    const receipt = receipts.find(r => r.id === receiptId);
                     showReceipt(receipt);
                 });
             });
@@ -1162,28 +954,13 @@
         }
 
         // Load receipt history
-        async function loadReceiptHistory() {
-            if (!API_URL) {
-                receiptHistory.innerHTML = '<p class="bangla-font text-center">Please configure API URL first</p>';
-                return;
-            }
+        function loadReceiptHistory() {
+            const activeReceipts = receipts.filter(r => !r.deleted);
             
-            const refreshButton = refreshHistory;
-            const originalText = refreshButton.innerHTML;
-            refreshButton.innerHTML = '<span class="loading"></span> Loading...';
-            refreshButton.disabled = true;
-            
-            const activeReceipts = await getAllReceipts();
-            
-            refreshButton.innerHTML = originalText;
-            refreshButton.disabled = false;
-            
-            if (!activeReceipts || activeReceipts.length === 0) {
+            if (activeReceipts.length === 0) {
                 receiptHistory.innerHTML = '<p class="bangla-font text-center">কোনো রসিদ পাওয়া যায়নি</p>';
                 return;
             }
-            
-            receipts = activeReceipts;
             
             // Sort receipts by date (newest first)
             const sortedReceipts = [...activeReceipts].sort((a, b) => b.id - a.id);
@@ -1224,7 +1001,7 @@
             viewButtons.forEach(button => {
                 button.addEventListener('click', function() {
                     const receiptId = parseInt(this.getAttribute('data-id'));
-                    const receipt = activeReceipts.find(r => r.id === receiptId);
+                    const receipt = receipts.find(r => r.id === receiptId);
                     showReceipt(receipt);
                 });
             });
@@ -1240,23 +1017,10 @@
         }
 
         // Load deleted receipts
-        async function loadDeletedReceipts() {
-            if (!API_URL) {
-                deletedReceipts.innerHTML = '<p class="bangla-font text-center">Please configure API URL first</p>';
-                return;
-            }
+        function loadDeletedReceipts() {
+            const deletedReceiptsList = receipts.filter(r => r.deleted);
             
-            const refreshButton = refreshDeleted;
-            const originalText = refreshButton.innerHTML;
-            refreshButton.innerHTML = '<span class="loading"></span> Loading...';
-            refreshButton.disabled = true;
-            
-            const deletedReceiptsList = await getDeletedReceipts();
-            
-            refreshButton.innerHTML = originalText;
-            refreshButton.disabled = false;
-            
-            if (!deletedReceiptsList || deletedReceiptsList.length === 0) {
+            if (deletedReceiptsList.length === 0) {
                 deletedReceipts.innerHTML = '<p class="bangla-font text-center">কোনো ডিলিট করা রসিদ পাওয়া যায়নি</p>';
                 return;
             }
@@ -1278,7 +1042,7 @@
                             </span>
                         </p>
                         <p class="bangla-font"><strong>তারিখ:</strong> ${receipt.date}</p>
-                        <p class="bangla-font"><strong>ডিলিটের তারিখ:</极端 ${receipt.deletedDate}</p>
+                        <p class="bangla-font"><strong>ডিলিটের তারিখ:</strong> ${receipt.deletedDate}</p>
                         <div class="action-buttons mt-3">
                             <button class="view-receipt bg-blue-500 text-white px-3 py-1 rounded-lg bangla-font" data-id="${receipt.id}">
                                 <i class="fas fa-eye"></i> দেখুন
@@ -1298,7 +1062,7 @@
             viewButtons.forEach(button => {
                 button.addEventListener('click', function() {
                     const receiptId = parseInt(this.getAttribute('data-id'));
-                    const receipt = deletedReceiptsList.find(r => r.id === receiptId);
+                    const receipt = receipts.find(r => r.id === receiptId);
                     showReceipt(receipt);
                 });
             });
@@ -1314,41 +1078,62 @@
         }
 
         // Delete receipt
-        async function deleteReceipt(receiptId) {
-            if (!API_URL) {
-                alert('Please configure the API URL first');
+        function deleteReceipt(receiptId) {
+            if (!confirm('আপনি কি এই রসিদ ডিলিট করতে চান?')) return;
+            
+            const receiptIndex = receipts.findIndex(r => r.id === receiptId);
+            
+            if (receiptIndex === -1) {
+                alert('রসিদ পাওয়া যায়নি');
                 return;
             }
             
-            if (!confirm('আপনি কি এই রসিদ ডিলিট করতে চান?')) return;
+            // Update receipt
+            receipts[receiptIndex].deleted = true;
+            receipts[receiptIndex].deletedDate = new Date().toLocaleString('bn-BD');
             
-            const result = await deleteReceiptApi(receiptId);
+            // Save to storage
+            localStorage.setItem('tailorReceipts', JSON.stringify(receipts));
             
-            if (result) {
-                alert('রসিদ ডিলিট করা হয়েছে');
-                
-                // Reload history
-                loadReceiptHistory();
-                loadDeletedReceipts();
-            }
+            alert('রসিদ ডিলিট করা হয়েছে');
+            
+            // Reload history
+            loadReceiptHistory();
+            loadDeletedReceipts();
         }
 
         // Restore receipt
-        async function restoreReceipt(receiptId) {
-            if (!API_URL) {
-                alert('Please configure the API URL first');
+        function restoreReceipt(receiptId) {
+            const receiptIndex = receipts.findIndex(r => r.id === receiptId);
+            
+            if (receiptIndex === -1) {
+                alert('রসিদ পাওয়া যায়নি');
                 return;
             }
             
-            const result = await restoreReceiptApi(receiptId);
+            // Check if deleted within 60 days
+            const deletedDate = new Date(receipts[receiptIndex].deletedDate);
+            const currentDate = new Date();
+            const diffTime = Math.abs(currentDate - deletedDate);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
             
-            if (result) {
-                alert('রসিদ পুনরুদ্ধার করা হয়েছে');
-                
-                // Reload history
-                loadReceiptHistory();
-                loadDeletedReceipts();
+            if (diffDays > 60) {
+                alert('দুঃখিত, ৬০ দিনের বেশি সময় হয়ে গেছে। এই রসিদ পুনরুদ্ধার করা যাবে না।');
+                return;
             }
+            
+            // Update receipt
+            receipts[receiptIndex].deleted = false;
+            receipts[receiptIndex].deletedDate = null;
+            
+            // Save to storage
+            localStorage.setItem('tailorReceipts', JSON.stringify(receipts));
+            
+            alert('রসিদ পুনরুদ্ধার করা হয়েছে');
+            
+            // Reload history
+            loadReceiptHistory();
+            loadDeletedReceipts();
         }
     </script>
 </body>
